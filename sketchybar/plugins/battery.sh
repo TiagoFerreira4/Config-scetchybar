@@ -1,28 +1,30 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
-PERCENTAGE="$(pmset -g batt | grep -Eo "\d+%" | cut -d% -f1)"
-CHARGING="$(pmset -g batt | grep 'AC Power')"
+pct_raw() { pmset -g batt | awk 'NR==2{print $3}' | tr -d ';'; }   # ex: 79%
+pct_num() { echo "$(pct_raw)" | tr -d '%' ; }                      # ex: 79 (número)
+plugged() { pmset -g batt | grep -q 'AC Power'; }                  # 0/1
 
-if [ "$PERCENTAGE" = "" ]; then
-  exit 0
-fi
+bat_icon() {
+  p=$(pct_num)
+  if plugged; then echo ""; return; fi            # carregando (Nerd Font)
+  if   [ "$p" -ge 90 ]; then echo ""
+  elif [ "$p" -ge 75 ]; then echo ""
+  elif [ "$p" -ge 50 ]; then echo ""
+  elif [ "$p" -ge 25 ]; then echo ""
+  else                       echo ""
+  fi
+}
 
-case "${PERCENTAGE}" in
-  9[0-9]|100) ICON=""
-  ;;
-  [6-8][0-9]) ICON=""
-  ;;
-  [3-5][0-9]) ICON=""
-  ;;
-  [1-2][0-9]) ICON=""
-  ;;
-  *) ICON=""
+update() {
+  sketchybar --set "$NAME" icon="$(bat_icon)" label="$(pct_raw)"
+}
+
+case "$SENDER" in
+  "routine"|"system_woke"|"power_source_change") update ;;
+  *)
+    sketchybar --add item battery right \
+               --set battery update_freq=60 script="$0" \
+               --subscribe battery system_woke power_source_change
+    update
+    ;;
 esac
-
-if [[ "$CHARGING" != "" ]]; then
-  ICON=""
-fi
-
-# The item invoking this script (name $NAME) will get its icon and label
-# updated with the current battery status
-sketchybar --set "$NAME" icon="$ICON" label="${PERCENTAGE}%"
